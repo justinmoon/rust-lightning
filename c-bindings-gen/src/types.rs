@@ -876,6 +876,9 @@ impl<'a, 'c: 'a> TypeResolver<'a, 'c> {
 	pub fn maybe_resolve_ident(&self, id: &syn::Ident) -> Option<String> {
 		if let Some(imp) = self.imports.get(id) {
 			Some(imp.clone())
+		} else if id.to_string() == "Keys".to_string() {
+			// FIXME: this is a hack because I don't know how to fix this properly
+			Some("crate::chain::keysinterface::ChannelKeys".to_string())
 		} else if self.declared.get(id).is_some() {
 			Some(self.module_path.to_string() + "::" + &format!("{}", id))
 		} else { None }
