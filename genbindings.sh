@@ -140,50 +140,50 @@ gcc -Wall -g -pthread demo.c target/debug/libldk.a -ldl
 # 	echo "You should create a symlink called clang++-$RUSTC_LLVM_V pointing to $CLANG in $(dirname $CLANG)"
 # fi
 
-# # Finally, if we're on OSX or on Linux, build the final debug binary with address sanitizer (and leave it there)
-# if [ "$HOST_PLATFORM" = "host: x86_64-unknown-linux-gnu" -o "$HOST_PLATFORM" = "host: x86_64-apple-darwin" ]; then
-# 	if [ "$CLANGPP" != "" ]; then
-# 		if [ "$HOST_PLATFORM" = "host: x86_64-apple-darwin" ]; then
-# 			# OSX sed is for some reason not compatible with GNU sed
-# 			sed -i .bk 's/,"cdylib"]/]/g' Cargo.toml
-# 		else
-# 			sed -i.bk 's/,"cdylib"]/]/g' Cargo.toml
-# 		fi
-# 		RUSTC_BOOTSTRAP=1 cargo rustc -v -- -Zsanitizer=address -Cforce-frame-pointers=yes || ( mv Cargo.toml.bk Cargo.toml; exit 1)
-# 		mv Cargo.toml.bk Cargo.toml
+# Finally, if we're on OSX or on Linux, build the final debug binary with address sanitizer (and leave it there)
+if [ "$HOST_PLATFORM" = "host: x86_64-unknown-linux-gnu" -o "$HOST_PLATFORM" = "host: x86_64-apple-darwin" ]; then
+	if [ "$CLANGPP" != "" ]; then
+		if [ "$HOST_PLATFORM" = "host: x86_64-apple-darwin" ]; then
+			# OSX sed is for some reason not compatible with GNU sed
+			sed -i .bk 's/,"cdylib"]/]/g' Cargo.toml
+		else
+			sed -i.bk 's/,"cdylib"]/]/g' Cargo.toml
+		fi
+		RUSTC_BOOTSTRAP=1 cargo rustc -v -- -Zsanitizer=address -Cforce-frame-pointers=yes || ( mv Cargo.toml.bk Cargo.toml; exit 1)
+		mv Cargo.toml.bk Cargo.toml
 
-# 		# First the C demo app...
-# 		$CLANG -fsanitize=address -Wall -g -pthread demo.c target/debug/libldk.a -ldl
-# 		ASAN_OPTIONS='detect_leaks=1 detect_invalid_pointer_pairs=1 detect_stack_use_after_return=1' ./a.out
+		# First the C demo app...
+		$CLANG -fsanitize=address -Wall -g -pthread demo.c target/debug/libldk.a -ldl
+		ASAN_OPTIONS='detect_leaks=1 detect_invalid_pointer_pairs=1 detect_stack_use_after_return=1' ./a.out
 
-# 		# ...then the C++ demo app
-# 		$CLANGPP -std=c++11 -fsanitize=address -Wall -g -pthread demo.cpp target/debug/libldk.a -ldl
-# 		ASAN_OPTIONS='detect_leaks=1 detect_invalid_pointer_pairs=1 detect_stack_use_after_return=1' ./a.out >/dev/null
-# 	else
-# 		echo "WARNING: Please install clang-$RUSTC_LLVM_V and clang++-$RUSTC_LLVM_V to build with address sanitizer"
-# 	fi
-# else
-# 	echo "WARNING: Can't use address sanitizer on non-Linux, non-OSX non-x86 platforms"
-# fi
+		# ...then the C++ demo app
+		$CLANGPP -std=c++11 -fsanitize=address -Wall -g -pthread demo.cpp target/debug/libldk.a -ldl
+		ASAN_OPTIONS='detect_leaks=1 detect_invalid_pointer_pairs=1 detect_stack_use_after_return=1' ./a.out >/dev/null
+	else
+		echo "WARNING: Please install clang-$RUSTC_LLVM_V and clang++-$RUSTC_LLVM_V to build with address sanitizer"
+	fi
+else
+	echo "WARNING: Can't use address sanitizer on non-Linux, non-OSX non-x86 platforms"
+fi
 
-# # Now build with LTO on on both C++ and rust, but without cross-language LTO:
-# cargo rustc -v --release -- -C lto
-# clang++ -std=c++11 -Wall -flto -O2 -pthread demo.cpp target/release/libldk.a -ldl
-# echo "C++ Bin size and runtime with only RL (LTO) optimized:"
-# ls -lha a.out
-# time ./a.out > /dev/null
+# Now build with LTO on on both C++ and rust, but without cross-language LTO:
+cargo rustc -v --release -- -C lto
+clang++ -std=c++11 -Wall -flto -O2 -pthread demo.cpp target/release/libldk.a -ldl
+echo "C++ Bin size and runtime with only RL (LTO) optimized:"
+ls -lha a.out
+time ./a.out > /dev/null
 
-# if [ "$HOST_PLATFORM" != "host: x86_64-apple-darwin" -a "$CLANGPP" != "" ]; then
-# 	# Finally, test cross-language LTO. Note that this will fail if rustc and clang++
-# 	# build against different versions of LLVM (eg when rustc is installed via rustup
-# 	# or Ubuntu packages). This should work fine on Distros which do more involved
-# 	# packaging than simply shipping the rustup binaries (eg Debian should Just Work
-# 	# here).
-# 	cargo rustc -v --release -- -C linker-plugin-lto -C lto -C link-arg=-fuse-ld=lld
-# 	$CLANGPP -Wall -std=c++11 -flto -fuse-ld=lld -O2 -pthread demo.cpp target/release/libldk.a -ldl
-# 	echo "C++ Bin size and runtime with cross-language LTO:"
-# 	ls -lha a.out
-# 	time ./a.out > /dev/null
-# else
-# 	echo "WARNING: Building with cross-language LTO is not avilable on OSX or without clang-$RUSTC_LLVM_V"
-# fi
+if [ "$HOST_PLATFORM" != "host: x86_64-apple-darwin" -a "$CLANGPP" != "" ]; then
+	# Finally, test cross-language LTO. Note that this will fail if rustc and clang++
+	# build against different versions of LLVM (eg when rustc is installed via rustup
+	# or Ubuntu packages). This should work fine on Distros which do more involved
+	# packaging than simply shipping the rustup binaries (eg Debian should Just Work
+	# here).
+	cargo rustc -v --release -- -C linker-plugin-lto -C lto -C link-arg=-fuse-ld=lld
+	$CLANGPP -Wall -std=c++11 -flto -fuse-ld=lld -O2 -pthread demo.cpp target/release/libldk.a -ldl
+	echo "C++ Bin size and runtime with cross-language LTO:"
+	ls -lha a.out
+	time ./a.out > /dev/null
+else
+	echo "WARNING: Building with cross-language LTO is not avilable on OSX or without clang-$RUSTC_LLVM_V"
+fi

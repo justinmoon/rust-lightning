@@ -126,7 +126,7 @@ struct NodeMonitors {
 	void ConnectBlock(const uint8_t (*header)[80], uint32_t height, LDKCVec_C2Tuple_usizeTransactionZZ tx_data, LDKBroadcasterInterface broadcast, LDKFeeEstimator fee_est) {
 		std::unique_lock<std::mutex> l(mut);
 		for (auto& mon : mons) {
-			LDK::CVec_C2Tuple_TxidCVec_TxOutZZZ res = ChannelMonitor_block_connected(&mon.second, &header_2, tx_data, height, broadcast, fee_est, *logger);
+			Vec_C2Tuple_TxidCVec_TxOutZZZ res = ChannelMonitor_block_connected(&mon.second, &header_2, tx_data, height, broadcast, fee_est, *logger);
 		}
 	}
 };
