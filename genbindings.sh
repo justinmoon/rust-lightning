@@ -51,94 +51,94 @@ fi
 gcc -Wall -g -pthread demo.c target/debug/libldk.a -ldl
 ./a.out
 
-# And run the C++ demo app in valgrind to test memory model correctness and lack of leaks.
-g++ -std=c++11 -Wall -g -pthread demo.cpp -Ltarget/debug/ -lldk -ldl
-if [ -x "`which valgrind`" ]; then
-	LD_LIBRARY_PATH=target/debug/ valgrind --error-exitcode=4 --memcheck:leak-check=full --show-leak-kinds=all ./a.out
-	echo
-else
-	echo "WARNING: Please install valgrind for more testing"
-fi
+# # And run the C++ demo app in valgrind to test memory model correctness and lack of leaks.
+# g++ -std=c++11 -Wall -g -pthread demo.cpp -Ltarget/debug/ -lldk -ldl
+# if [ -x "`which valgrind`" ]; then
+# 	LD_LIBRARY_PATH=target/debug/ valgrind --error-exitcode=4 --memcheck:leak-check=full --show-leak-kinds=all ./a.out
+# 	echo
+# else
+# 	echo "WARNING: Please install valgrind for more testing"
+# fi
 
-# Test a statically-linked C++ version, tracking the resulting binary size and runtime
-# across debug, LTO, and cross-language LTO builds (using the same compiler each time).
-clang++ -std=c++11 -Wall -pthread demo.cpp target/debug/libldk.a -ldl
-./a.out >/dev/null
-echo " C++ Bin size and runtime w/o optimization:"
-ls -lha a.out
-time ./a.out > /dev/null
+# # Test a statically-linked C++ version, tracking the resulting binary size and runtime
+# # across debug, LTO, and cross-language LTO builds (using the same compiler each time).
+# clang++ -std=c++11 -Wall -pthread demo.cpp target/debug/libldk.a -ldl
+# ./a.out >/dev/null
+# echo " C++ Bin size and runtime w/o optimization:"
+# ls -lha a.out
+# time ./a.out > /dev/null
 
-# Then, check with memory sanitizer, if we're on Linux and have rustc nightly
-if [ "$HOST_PLATFORM" = "host: x86_64-unknown-linux-gnu" ]; then
-	if cargo +nightly --version >/dev/null 2>&1; then
-		LLVM_V=$(rustc +nightly --version --verbose | grep "LLVM version" | awk '{ print substr($3, 0, 2); }')
-		if [ -x "$(which clang-$LLVM_V)" ]; then
-			cargo +nightly clean
-			cargo +nightly rustc -Zbuild-std --target x86_64-unknown-linux-gnu -v -- -Zsanitizer=memory -Zsanitizer-memory-track-origins -Cforce-frame-pointers=yes
-			mv target/x86_64-unknown-linux-gnu/debug/libldk.* target/debug/
+# # Then, check with memory sanitizer, if we're on Linux and have rustc nightly
+# if [ "$HOST_PLATFORM" = "host: x86_64-unknown-linux-gnu" ]; then
+# 	if cargo +nightly --version >/dev/null 2>&1; then
+# 		LLVM_V=$(rustc +nightly --version --verbose | grep "LLVM version" | awk '{ print substr($3, 0, 2); }')
+# 		if [ -x "$(which clang-$LLVM_V)" ]; then
+# 			cargo +nightly clean
+# 			cargo +nightly rustc -Zbuild-std --target x86_64-unknown-linux-gnu -v -- -Zsanitizer=memory -Zsanitizer-memory-track-origins -Cforce-frame-pointers=yes
+# 			mv target/x86_64-unknown-linux-gnu/debug/libldk.* target/debug/
 
-			# Sadly, std doesn't seem to compile into something that is memsan-safe as of Aug 2020,
-			# so we'll always fail, not to mention we may be linking against git rustc LLVM which
-			# may differ from clang-llvm, so just allow everything here to fail.
-			set +e
+# 			# Sadly, std doesn't seem to compile into something that is memsan-safe as of Aug 2020,
+# 			# so we'll always fail, not to mention we may be linking against git rustc LLVM which
+# 			# may differ from clang-llvm, so just allow everything here to fail.
+# 			set +e
 
-			# First the C demo app...
-			clang-$LLVM_V -std=c++11 -fsanitize=memory -fsanitize-memory-track-origins -Wall -g -pthread demo.c target/debug/libldk.a -ldl
-			./a.out
+# 			# First the C demo app...
+# 			clang-$LLVM_V -std=c++11 -fsanitize=memory -fsanitize-memory-track-origins -Wall -g -pthread demo.c target/debug/libldk.a -ldl
+# 			./a.out
 
-			# ...then the C++ demo app
-			clang++-$LLVM_V -std=c++11 -fsanitize=memory -fsanitize-memory-track-origins -Wall -g -pthread demo.cpp target/debug/libldk.a -ldl
-			./a.out >/dev/null
+# 			# ...then the C++ demo app
+# 			clang++-$LLVM_V -std=c++11 -fsanitize=memory -fsanitize-memory-track-origins -Wall -g -pthread demo.cpp target/debug/libldk.a -ldl
+# 			./a.out >/dev/null
 
-			# restore exit-on-failure
-			set -e
-		else
-			echo "WARNING: Can't use memory sanitizer without clang-$LLVM_V"
-		fi
-	else
-		echo "WARNING: Can't use memory sanitizer without rustc nightly"
-	fi
-else
-	echo "WARNING: Can't use memory sanitizer on non-Linux, non-x86 platforms"
-fi
+# 			# restore exit-on-failure
+# 			set -e
+# 		else
+# 			echo "WARNING: Can't use memory sanitizer without clang-$LLVM_V"
+# 		fi
+# 	else
+# 		echo "WARNING: Can't use memory sanitizer without rustc nightly"
+# 	fi
+# else
+# 	echo "WARNING: Can't use memory sanitizer on non-Linux, non-x86 platforms"
+# fi
 
-RUSTC_LLVM_V=$(rustc --version --verbose | grep "LLVM version" | awk '{ print substr($3, 0, 2); }' | tr -d '.')
+# RUSTC_LLVM_V=$(rustc --version --verbose | grep "LLVM version" | awk '{ print substr($3, 0, 2); }' | tr -d '.')
 
-if [ "$HOST_PLATFORM" = "host: x86_64-apple-darwin" ]; then
-	# Apple is special, as always, and decided that they must ensure that there is no way to identify
-	# the LLVM version used. Why? Just to make your life hard.
-	# This list is taken from https://en.wikipedia.org/wiki/Xcode
-	APPLE_CLANG_V=$(clang --version | head -n1 | awk '{ print $4 }')
-	if [ "$APPLE_CLANG_V" = "10.0.0" ]; then
-		CLANG_LLVM_V="6"
-	elif [ "$APPLE_CLANG_V" = "10.0.1" ]; then
-		CLANG_LLVM_V="7"
-	elif [ "$APPLE_CLANG_V" = "11.0.0" ]; then
-		CLANG_LLVM_V="8"
-	elif [ "$APPLE_CLANG_V" = "11.0.3" ]; then
-		CLANG_LLVM_V="9"
-	elif [ "$APPLE_CLANG_V" = "12.0.0" ]; then
-		CLANG_LLVM_V="10"
-	else
-		echo "WARNING: Unable to identify Apple clang LLVM version"
-		CLANG_LLVM_V="0"
-	fi
-else
-	CLANG_LLVM_V=$(clang --version | head -n1 | awk '{ print substr($4, 0, 2); }' | tr -d '.')
-fi
+# if [ "$HOST_PLATFORM" = "host: x86_64-apple-darwin" ]; then
+# 	# Apple is special, as always, and decided that they must ensure that there is no way to identify
+# 	# the LLVM version used. Why? Just to make your life hard.
+# 	# This list is taken from https://en.wikipedia.org/wiki/Xcode
+# 	APPLE_CLANG_V=$(clang --version | head -n1 | awk '{ print $4 }')
+# 	if [ "$APPLE_CLANG_V" = "10.0.0" ]; then
+# 		CLANG_LLVM_V="6"
+# 	elif [ "$APPLE_CLANG_V" = "10.0.1" ]; then
+# 		CLANG_LLVM_V="7"
+# 	elif [ "$APPLE_CLANG_V" = "11.0.0" ]; then
+# 		CLANG_LLVM_V="8"
+# 	elif [ "$APPLE_CLANG_V" = "11.0.3" ]; then
+# 		CLANG_LLVM_V="9"
+# 	elif [ "$APPLE_CLANG_V" = "12.0.0" ]; then
+# 		CLANG_LLVM_V="10"
+# 	else
+# 		echo "WARNING: Unable to identify Apple clang LLVM version"
+# 		CLANG_LLVM_V="0"
+# 	fi
+# else
+# 	CLANG_LLVM_V=$(clang --version | head -n1 | awk '{ print substr($4, 0, 2); }' | tr -d '.')
+# fi
 
-if [ "$CLANG_LLVM_V" = "$RUSTC_LLVM_V" ]; then
-	CLANG=clang
-	CLANGPP=clang++
-elif [ "$(which clang-$RUSTC_LLVM_V)" != "" ]; then
-	CLANG="$(which clang-$RUSTC_LLVM_V)"
-	CLANGPP="$(which clang++-$RUSTC_LLVM_V)"
-fi
+# if [ "$CLANG_LLVM_V" = "$RUSTC_LLVM_V" ]; then
+# 	CLANG=clang
+# 	CLANGPP=clang++
+# elif [ "$(which clang-$RUSTC_LLVM_V)" != "" ]; then
+# 	CLANG="$(which clang-$RUSTC_LLVM_V)"
+# 	CLANGPP="$(which clang++-$RUSTC_LLVM_V)"
+# fi
 
-if [ "$CLANG" != "" -a "$CLANGPP" = "" ]; then
-	echo "WARNING: It appears you have a clang-$RUSTC_LLVM_V but not clang++-$RUSTC_LLVM_V. This is common, but leaves us unable to compile C++ with LLVM $RUSTC_LLVM_V"
-	echo "You should create a symlink called clang++-$RUSTC_LLVM_V pointing to $CLANG in $(dirname $CLANG)"
-fi
+# if [ "$CLANG" != "" -a "$CLANGPP" = "" ]; then
+# 	echo "WARNING: It appears you have a clang-$RUSTC_LLVM_V but not clang++-$RUSTC_LLVM_V. This is common, but leaves us unable to compile C++ with LLVM $RUSTC_LLVM_V"
+# 	echo "You should create a symlink called clang++-$RUSTC_LLVM_V pointing to $CLANG in $(dirname $CLANG)"
+# fi
 
 # Finally, if we're on OSX or on Linux, build the final debug binary with address sanitizer (and leave it there)
 if [ "$HOST_PLATFORM" = "host: x86_64-unknown-linux-gnu" -o "$HOST_PLATFORM" = "host: x86_64-apple-darwin" ]; then
